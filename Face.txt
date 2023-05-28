@@ -1,0 +1,106 @@
+from tkinter import simpledialog
+import face_recognition
+import docopt
+from sklearn import svm
+import os
+import imageio
+import numpy as np
+import cv2
+import time
+import numpy as np
+from os import remove
+import threading 
+
+
+
+def face_recognize(dir):
+	encodings = []
+	names = []
+
+	# Training directory
+	train_dir = os.path.join(os.getcwd(), dir)
+	train_images = os.listdir(train_dir)
+
+	# Loop through each person in the training directory
+	for person in train_images:
+		pix = os.listdir(os.path.join(train_dir, person))
+
+		# Loop through each training image for the current person
+		for person_img in pix:
+			# Get the face encodings for the face in each image file
+			face = face_recognition.load_image_file(os.path.join(train_dir, person, person_img))
+			face_bounding_boxes = face_recognition.face_locations(face)
+
+			# If training image contains exactly one face
+			if len(face_bounding_boxes) == 1:
+				face_enc = face_recognition.face_encodings(face)[0]
+				# Add face encoding for current image
+				# with corresponding label (name) to the training data
+				encodings.append(face_enc)
+				names.append(person)
+			else:
+				print(person + "/" + person_img + " can't be used for training")
+
+	# Create and train the SVC classifier
+	clf = svm.SVC(gamma='scale', probability=True)
+	clf.fit(encodings, names)
+
+	reader = imageio.get_reader('kul.JPG')
+	for frame in reader:
+		
+		face_locations = face_recognition.face_locations(frame)
+		no = len(face_locations)
+		
+		print("Number of faces detected: ", no)
+
+		print("Found:")
+		
+		for i in range(no):
+			test_image_enc = face_recognition.face_encodings(frame)[i]
+			name = clf.predict([test_image_enc])
+			confidence = max(clf.predict_proba([test_image_enc])[0])
+			
+			if confidence < 0.4:
+				name = ["Unknown"]
+				
+			print(*name)
+
+face_recognize("train_dir")
+
+
+
+# Import libraries
+import cv2
+import numpy as np
+import tensorflow as tf
+
+# Load the image file
+image = cv2.imread("face.jpg")
+
+# Convert the image to grayscale
+image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+# Resize the image to 64x64 pixels
+image = cv2.resize(image, (64, 64))
+
+# Normalize the pixel values
+image = image / 255.0
+
+# Reshape the image to fit the model input
+image = np.reshape(image, (1, 64, 64, 1))
+
+# Load the pre-trained model
+model = tf.keras.models.load_model("face_recognition_model.h5")
+
+# Predict the face identity
+prediction = model.predict(image)
+
+# Get the index of the highest probability
+index = np.argmax(prediction)
+
+# Get the name of the person from a dictionary
+names = {0: "Alice", 1: "Bob", 2: "Charlie", 3: "David", 4: "Eve"}
+name = names[index]
+
+# Print the result
+print(f"The face in the image is {name}.")
